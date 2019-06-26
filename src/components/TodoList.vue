@@ -187,12 +187,10 @@ export default class TodoList extends Vue {
   }
   async addTodo(): Promise<any> {
     await this.todos.addTodo( new Todo(0, this.tag, this.todo, false));
-    console.log('TodoList.addTodo');
     this.tag = this.todo = '';
   }
   async deleteTodo(target: Todo): Promise<any> {
     await this.todos.deleteTodo(target);
-    console.log('TodoList.deleteTodo');
   }
   completed(todo: Todo): void {
     this.$nextTick(() => {
@@ -200,9 +198,7 @@ export default class TodoList extends Vue {
     });
   }
   async created(): Promise<void> {
-    console.log('before this.todos.init()');
     await this.todos.init();
-    console.log('after this.todos.init()');
   }
 }
 </script>
