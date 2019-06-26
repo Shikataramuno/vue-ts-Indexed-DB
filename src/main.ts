@@ -9,8 +9,6 @@ import Todos from './models/Todos';
 Vue.use(BootstrapVue);
 Vue.config.productionTip = false;
 
-const todos: Todos = Todos.getInstance();
-
 new Vue({
   render: (h) => h(App),
 }).$mount('#app');

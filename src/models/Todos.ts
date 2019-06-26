@@ -1,7 +1,5 @@
 import Todo from './Todo';
 
-const ToDosKeyWord: string = 'Todos';
-const IdKeyWord: string = 'id';
 export default class Todos {
 
   static getInstance(): Todos {
@@ -15,50 +13,163 @@ export default class Todos {
 
   private static instance: Todos;
   private todos: Todo[] = [];
-  private id: number = 1;
+  private dbName: string = 'TodosDb';
+  private todosObjectStore: string = 'Todos';
+  private db!: IDBDatabase;
 
   constructor() {
     console.log('Todos class constructor');
-    if (IdKeyWord in localStorage) {
-      this.id = JSON.parse(localStorage.getItem(IdKeyWord) as string) as number;
-    } else {
-      localStorage.setItem(IdKeyWord, JSON.stringify(this.id));
-    }
-    if (ToDosKeyWord in localStorage) {
-      const objs: Todo[] = JSON.parse(localStorage.getItem(ToDosKeyWord) as string) as Todo[];
-      objs.forEach((obj: Todo) => {
-        const todo: Todo = new Todo(obj.id, obj.tag, obj.todo, obj.complete);
-        this.todos.push(todo);
-      });
-    } else {
-      localStorage.setItem(ToDosKeyWord, JSON.stringify(this.todos));
-    }
   }
-
+  async init(): Promise<any> {
+    console.log('Todos.init');
+    await this.connectDb();
+    this.todos = (await this.retrieveTodos() as Todo[]);
+    console.log(this.todos);
+  }
+  async connectDb(): Promise<string> {
+    console.log('Todos.connectDb');
+    const p: Promise<string> =
+     new Promise<string>((resolve: (value?: string) => void, reject: (reason?: any) => void) => {
+      const req = window.indexedDB.open(this.dbName, 1);
+      req.onsuccess = (ev: Event) => {
+        console.log('req.onsuccess');
+        console.log(ev);
+        this.db = ((ev.target as IDBOpenDBRequest).result as IDBDatabase);
+        console.log(this.db);
+        resolve('success to open db');
+      };
+      req.onerror = (ev: Event) => {
+        console.log('req.onerror');
+        console.log(ev);
+        const err = 'fails to open db';
+        reject(err);
+      };
+      req.onupgradeneeded = (ev: Event) => {
+        console.log('req.onupgradeneeded');
+        console.log(ev);
+        const dbReq: IDBOpenDBRequest = ev.target as IDBOpenDBRequest;
+        this.db = dbReq.result as IDBDatabase;
+        if (this.db.objectStoreNames.contains(this.todosObjectStore)) {
+          this.db.deleteObjectStore(this.todosObjectStore); // Todos ObjectStoreの作成
+        }
+        this.db.createObjectStore(this.todosObjectStore, {autoIncrement: true});
+      };
+    });
+    return p;
+  }
+  async retrieveTodos(): Promise<Todo[]> {
+    console.log('Todos.retreiveTodos');
+    const p: Promise<Todo[]> =
+      new Promise<Todo[]>((resolve: (value?: Todo[]) => void, reject: (reason?: any) => void) => {
+      const objStore: IDBObjectStore =
+        this.db.transaction(this.todosObjectStore, 'readwrite').objectStore(this.todosObjectStore) ;
+      const range: IDBKeyRange = IDBKeyRange.lowerBound(0);
+      const cur: IDBRequest<IDBCursorWithValue | null> = objStore.openCursor(range);
+      const todos: Todo[] = [];
+      cur.onsuccess = (e) => {
+        console.log('Todos.retrieveTodos onsuccess');
+        const cursor: IDBCursorWithValue = (e.target as IDBRequest).result as IDBCursorWithValue;
+        if (cursor) {
+          const data: Todo = cursor.value as Todo;
+          const todo: Todo = new Todo(
+            Number(cursor.key),
+            data.tag,
+            data.todo,
+            data.complete,
+          );
+          // console.log(rec)
+          todos.push(todo);
+          cursor.continue();
+        } else {
+          console.log('Todos.retrieveTodos onsuccess resolve');
+          resolve(todos);
+        }
+      };
+      cur.onerror = (err) => {
+        console.log('Todos.retrieveTodos onerror');
+        reject(err);
+      };
+    });
+    return p;
+  }
   getTodos(): Todo[] {
-    return this.todos.slice();
+    return this.todos;
   }
 
-  update(todo: Todo): void {
-    const index: number = this.todos.findIndex((td: Todo) => {
-      return td.id === todo.id;
+  async addTodo(todo: Todo): Promise<any> {
+    await this.add(todo);
+    this.todos = (await this.retrieveTodos() as Todo[]);
+  }
+  async add(todo: Todo): Promise<string> {
+    const p: Promise<string> =
+    new Promise<string>((resolve: (value?: string) => void, reject: (reason?: any) => void) => {
+      const id: number = Math.max(...this.todos.map((m) => m.id));
+      todo.id = ( Number.MIN_SAFE_INTEGER <= id && id <= Number.MAX_SAFE_INTEGER) ? id + 1 : 0;
+      console.log('Todos.addTodo');
+      const tx: IDBTransaction = this.db.transaction(this.todosObjectStore, 'readwrite');
+      tx.onerror = (e: Event) => {
+        console.log('transaction add error');
+        console.log(e);
+        reject(e);
+      };
+      tx.oncomplete = (e: Event) => {
+        console.log('transaction add complete');
+        console.log(e);
+        resolve('transaction add complete');
+      };
+      tx.objectStore(this.todosObjectStore).add(todo);
     });
-    this.todos[index] = todo;
-    localStorage.setItem(ToDosKeyWord, JSON.stringify(this.todos));
+    return p;
   }
 
-  addTodo(todo: Todo): void {
-    todo.id = this.id;
-    this.todos.push(todo);
-    localStorage.setItem(ToDosKeyWord, JSON.stringify(this.todos));
-    this.id++;
-    localStorage.setItem(IdKeyWord, JSON.stringify(this.id));
+  async updateTodo(target: Todo): Promise<any> {
+    await this.update(target);
+    this.todos = (await this.retrieveTodos() as Todo[]);
   }
-
-  delete(target: Todo): void {
-    this.todos = this.todos.filter((todo: Todo) => {
-      return todo.id !== target.id;
+  update(target: Todo): Promise<string> {
+    const p: Promise<string> =
+    new Promise<string>((resolve: (value?: string) => void, reject: (reason?: any) => void) => {
+      const key: IDBValidKey = target.id;
+      console.log('key is ' + key);
+      const tx: IDBTransaction = this.db.transaction(this.todosObjectStore, 'readwrite');
+      tx.onerror = (e: Event) => {
+        console.log('transaction add error');
+        console.log(e);
+        reject(e);
+      };
+      tx.oncomplete = (e: Event) => {
+        console.log('transaction add complete');
+        console.log(e);
+        resolve('transaction add complete');
+      };
+      tx.objectStore(this.todosObjectStore).put(target, key);
     });
-    localStorage.setItem(ToDosKeyWord, JSON.stringify(this.todos));
+    return p;
+  }
+
+  async deleteTodo(target: Todo): Promise<any> {
+    await this.delete(target);
+    this.todos = (await this.retrieveTodos() as Todo[]);
+  }
+  async delete(target: Todo): Promise<string> {
+    const p: Promise<string> =
+    new Promise<string>((resolve: (value?: string) => void, reject: (reason?: any) => void) => {
+      console.log('PendingRequestsManager.deletePendingRequests');
+      const key: IDBValidKey = target.id;
+      console.log('key is ' + key);
+      const tx: IDBTransaction = this.db.transaction(this.todosObjectStore, 'readwrite');
+      tx.onerror = (e: Event) => {
+        console.log('transaction delete error');
+        console.log(e);
+        reject(e);
+      };
+      tx.oncomplete = (e: Event) => {
+        console.log('transaction delete complete');
+        console.log(e);
+        resolve('transactio delete complete');
+      };
+      tx.objectStore(this.todosObjectStore).delete(key);
+    });
+    return p;
   }
 }

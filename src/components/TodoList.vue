@@ -119,7 +119,7 @@
                 <b-button
                   class="delete-button"
                   variant="success"
-                  @click="delComplete(todo)">
+                  @click="deleteTodo(todo)">
                     削除
                 </b-button>
               </span>
@@ -185,18 +185,24 @@ export default class TodoList extends Vue {
   edit(id: number): void {
     this.selectedId = id;
   }
-  addTodo(): void {
-    this.todos.addTodo( new Todo(0, this.tag, this.todo, false));
+  async addTodo(): Promise<any> {
+    await this.todos.addTodo( new Todo(0, this.tag, this.todo, false));
+    console.log('TodoList.addTodo');
     this.tag = this.todo = '';
   }
-  delComplete(target: Todo): void {
-    console.log('delComplete');
-    this.todos.delete(target);
+  async deleteTodo(target: Todo): Promise<any> {
+    await this.todos.deleteTodo(target);
+    console.log('TodoList.deleteTodo');
   }
   completed(todo: Todo): void {
     this.$nextTick(() => {
       this.todos.update(todo);
     });
+  }
+  async created(): Promise<void> {
+    console.log('before this.todos.init()');
+    await this.todos.init();
+    console.log('after this.todos.init()');
   }
 }
 </script>
