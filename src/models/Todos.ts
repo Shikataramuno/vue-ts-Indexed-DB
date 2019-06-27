@@ -22,10 +22,30 @@ export default class Todos {
     await this.connectDb();
     this.todos = (await this.retrieveTodos() as Todo[]);
   }
-  async connectDb(): Promise<string> {
+  getTodos(): Todo[] {
+    return this.todos;
+  }
+
+  async addTodo(todo: Todo): Promise<any> {
+    await this.add(todo);
+    this.todos = (await this.retrieveTodos() as Todo[]);
+  }
+
+  async updateTodo(target: Todo): Promise<any> {
+    await this.update(target);
+    this.todos = (await this.retrieveTodos() as Todo[]);
+  }
+
+  async deleteTodo(target: Todo): Promise<any> {
+    await this.delete(target);
+    this.todos = (await this.retrieveTodos() as Todo[]);
+  }
+
+  // Private Method
+  private async connectDb(): Promise<string> {
     const p: Promise<string> =
      new Promise<string>((resolve: (value?: string) => void, reject: (reason?: any) => void) => {
-      const req = window.indexedDB.open(this.dbName, 1);
+      const req: IDBOpenDBRequest = window.indexedDB.open(this.dbName, 1);
       req.onsuccess = (ev: Event) => {
         this.db = ((ev.target as IDBOpenDBRequest).result as IDBDatabase);
         resolve('success to open db');
@@ -45,7 +65,7 @@ export default class Todos {
     });
     return p;
   }
-  async retrieveTodos(): Promise<Todo[]> {
+  private async retrieveTodos(): Promise<Todo[]> {
     const p: Promise<Todo[]> =
       new Promise<Todo[]>((resolve: (value?: Todo[]) => void, reject: (reason?: any) => void) => {
       const objStore: IDBObjectStore =
@@ -76,15 +96,7 @@ export default class Todos {
     });
     return p;
   }
-  getTodos(): Todo[] {
-    return this.todos;
-  }
-
-  async addTodo(todo: Todo): Promise<any> {
-    await this.add(todo);
-    this.todos = (await this.retrieveTodos() as Todo[]);
-  }
-  async add(todo: Todo): Promise<string> {
+  private async add(todo: Todo): Promise<string> {
     const p: Promise<string> =
     new Promise<string>((resolve: (value?: string) => void, reject: (reason?: any) => void) => {
       const id: number = Math.max(...this.todos.map((m) => m.id));
@@ -100,12 +112,7 @@ export default class Todos {
     });
     return p;
   }
-
-  async updateTodo(target: Todo): Promise<any> {
-    await this.update(target);
-    this.todos = (await this.retrieveTodos() as Todo[]);
-  }
-  update(target: Todo): Promise<string> {
+  private async update(target: Todo): Promise<string> {
     const p: Promise<string> =
     new Promise<string>((resolve: (value?: string) => void, reject: (reason?: any) => void) => {
       const key: IDBValidKey = target.id;
@@ -121,11 +128,7 @@ export default class Todos {
     return p;
   }
 
-  async deleteTodo(target: Todo): Promise<any> {
-    await this.delete(target);
-    this.todos = (await this.retrieveTodos() as Todo[]);
-  }
-  async delete(target: Todo): Promise<string> {
+  private async delete(target: Todo): Promise<string> {
     const p: Promise<string> =
     new Promise<string>((resolve: (value?: string) => void, reject: (reason?: any) => void) => {
       const key: IDBValidKey = target.id;
@@ -140,4 +143,5 @@ export default class Todos {
     });
     return p;
   }
+
 }

@@ -194,7 +194,7 @@ export default class TodoList extends Vue {
   }
   completed(todo: Todo): void {
     this.$nextTick(() => {
-      this.todos.update(todo);
+      this.todos.updateTodo(todo);
     });
   }
   async created(): Promise<void> {
